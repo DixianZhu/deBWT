@@ -1,0 +1,14 @@
+uint64_t case3num,blueBoundNum,redCapacity,blueCapacity;
+uint64_t *blackTable;
+uint64_t BWTLEN;
+uint64_t ref_length,compress_length;
+uint64_t *reference;
+uint64_t specialBranchNum;
+int ascend(const void *a, const void *b);
+char getCharacter(uint64_t index);
+uint64_t BinarySearch_unsigned(unsigned int mk, unsigned int *target, int64_t up);
+void *multiGenerateSP(void *arg);
+void *multiGenerateSplit(void *arg);
+void *multiAddSeg(void *arg);
+void *multiCatSP(void *arg);
+void *multiConnect(void *arg);
