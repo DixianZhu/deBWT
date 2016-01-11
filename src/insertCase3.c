@@ -10,24 +10,27 @@ uint64_t *specialPos=NULL;
 uint64_t dollarPos;
 uint64_t (*occ)[4]=NULL;
 uint64_t dbgACGT2[4]={0,0,0,0};
-int insertCase3(void)
+int insertCase3(char *obj, char *bin)
 {
 	//read bound and case2bwt into the RAM
-	char *case3boundPath=getPath("/case3bound");
+	time_t insert_start=time(0);
+	char *case3boundPath=getPath(bin,"/case3bound");
 	FILE *fpCase3Bound=fopen(case3boundPath,"rb");
-	free(case3boundPath);
 	case3bound=(uint64_t *)calloc(case3num,sizeof(uint64_t));
 	fread(case3bound,sizeof(uint64_t),case3num,fpCase3Bound);
 	fclose(fpCase3Bound);
-	char *case2bwtPath=getPath("/case2bwt");
+	remove(case3boundPath);
+	free(case3boundPath);
+	char *case2bwtPath=getPath(bin,"/case2bwt");
 	FILE *fpbwt=fopen(case2bwtPath,"rb");
-	free(case2bwtPath);
 	uint64_t case2len=tempBWTLen;
 	uint64_t case2space=case2len>>5; 
 	if(case2len&MOD32) case2space++;
 	case2bwt=(uint64_t *)calloc(case2space,sizeof(uint64_t));
 	fread(case2bwt,sizeof(uint64_t),case2space,fpbwt);
 	fclose(fpbwt);
+	remove(case2bwtPath);
+	free(case2bwtPath);
 	//end
 	//merge the bwt file
 	bwtLen=case2len+blueCapacity;
@@ -36,6 +39,7 @@ int insertCase3(void)
 	if(bwtLen&MOD32) bwtSpace++;
 	bwt=(uint64_t *)calloc(bwtSpace,sizeof(uint64_t));
 	uint64_t i,segBlue=0,j,segCase2=0;
+	/*
 	printf("let's check case2bwt:\n");
 	for(i=tempBWTLen-11;i<tempBWTLen;i++)
 	{
@@ -45,6 +49,7 @@ int insertCase3(void)
 		uint64_t dimer=(case2bwt[I]>>moveI)&3;
 		printf("%c\n","ACGT"[dimer] );
 	}
+	*/
 	uint64_t modJ,indexJ,moveJ,dimer;//target bwt string
 	specialPos=(uint64_t *)calloc(countRead-1,sizeof(uint64_t));
 	uint64_t specialPoint=0;
@@ -79,13 +84,13 @@ int insertCase3(void)
 			if(dimer==4)//record all the bwt position of #
 			{
 				specialPos[specialPoint++]=j;
-				printf("#:%lu\n",j);
+				//printf("#:%lu\n",j);
 				dimer=3;
 			}
 			if(dimer==5)//record the bwt position of $
 			{
 				dollarPos=j;
-				printf("$:%lu\n",j);
+				//printf("$:%lu\n",j);
 				dimer=3;
 			}
 			bwt[indexJ]=bwt[indexJ]|(dimer<<moveJ);
@@ -97,25 +102,46 @@ int insertCase3(void)
 		//{case3bound[case3num-1]+1,bwtLen-1} inserted the case2
 		segCase2=insertCase2(case3bound[case3num-1]+1,bwtLen-1,segCase2);
 	}
-    /*
-    printf("After sort blue, let's check ACGT:(case2bwt verify)\n");
-    printf("A:%lu, C:%lu, G:%lu, T:%lu\n",dbgACGT[0],dbgACGT[1],dbgACGT[2],dbgACGT[3]);
-    printf("dbgACGT2(check whether insert error):\n");
-    printf("A:%lu, C:%lu, G:%lu, T:%lu\n",dbgACGT2[0],dbgACGT2[1],dbgACGT2[2],dbgACGT2[3]);
-    */
 	printf("segCase2=%lu\n",segCase2 );
 	printf("segBlue=%lu\n",segBlue );
     printf("blueCapacity=%lu\n",blueCapacity);
 	free(case3bound);
 	free(case2bwt);
 	free(blueTable);
+	time_t insert_end=time(0);
+	long insert_time=insert_end-insert_start;
+	printf("merge case time: %lu\n", insert_time);
+
+	char *bwtPath=obj;
+	fpbwt=fopen(bwtPath,"wb");
+	if(fpbwt==NULL) fprintf(stderr,"cannot create %s!\n",bwtPath), exit(1);
+	fwrite(bwt,sizeof(uint64_t),bwtSpace,fpbwt);
+	fclose(fpbwt);
+	free(bwt);
+
+	bwtPath=getPath(obj,".#");
+	fpbwt=fopen(bwtPath,"wb");
+	if(fpbwt==NULL) fprintf(stderr,"cannot create %s!\n",bwtPath), exit(1);
+	fwrite(specialPos,sizeof(uint64_t),countRead-1,fpbwt);
+	free(specialPos);
+	free(bwtPath);
+
+    bwtPath=getPath(obj,".$");
+	fpbwt=fopen(bwtPath,"wb");
+	if(fpbwt==NULL) fprintf(stderr,"cannot create %s!\n",bwtPath), exit(1);
+	fwrite(&dollarPos,sizeof(uint64_t),1,fpbwt);
+	free(bwtPath);
+
+	fprintf(stderr, "success output bwt!\n");
+	exit(0);
+	////////////////////////////////developer mode///////////////////////////////////////
 	// get the occ
 	uint64_t occLen=(bwtLen>>5)+1;
 	occ=(uint64_t (*)[4])calloc(4*occLen,sizeof(uint64_t));
 	uint64_t tempOcc[4]={0,0,0,0};
-	uint64_t modI,indexI,moveI;//target bwt string
+	uint64_t modI=0,indexI=0,moveI=0;//target bwt string
 	uint64_t check=0;
-	printf("bwt:\n");
+	printf("bwt occ part...\n");
 	for(i=0;i<bwtLen;i++)
 	{
 		indexI=i>>5;
@@ -167,8 +193,8 @@ int insertCase3(void)
     printf("I:%lu, A:%lu, C:%lu, G:%lu, T:%lu\n",
       (indexI<<5)+31,tempOcc[0],tempOcc[1],tempOcc[2],tempOcc[3] );
 	// write out the bwt information
-	
-	for(i=(indexI<<5)+32;i<bwtLen;i++)
+	/*
+	for(i=(indexI<<5);i<bwtLen;i++)
 	{
 		indexI=i>>5;
     	modI=i&MOD32;
@@ -176,11 +202,7 @@ int insertCase3(void)
 		dimer=(bwt[indexI]>>moveI)&3;
 	 	printf("%lu: %c \n",i,"ACGT"[dimer]);
 	}
-	char *bwtPath=getPath("/bwt");
-	fpbwt=fopen(bwtPath,"wb");
-	free(bwtPath);
-	fwrite(bwt,sizeof(uint64_t),bwtSpace,fpbwt);
-	fclose(fpbwt);
+	*/
 	return 1;
 }
 uint64_t insertCase2(uint64_t low, uint64_t up, uint64_t segCase2)

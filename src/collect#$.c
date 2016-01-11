@@ -14,29 +14,44 @@ uint64_t specialBranchNum=0;
 uint64_t ACGT[4]={0,0,0,0};
 uint64_t *SA=NULL;
 uint64_t multiFlag=1;
+uint64_t branchNum=0;
+uint64_t *specialHash=NULL;
+uint64_t *invHash=NULL;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-char *dbgBWT=NULL;
+//char *dbgBWT=NULL;
 char cis[4]={'A','C','G','T'};
+//char dbgStr1040[30];
 #define MOD32 31
 #define MOD64 63
 KSEQ_INIT(gzFile, gzread);
-int collect(char *path)
+void *collect(void *arg_collect)
 {
+   void **arg=(void **) arg_collect;
+   char *path=(char *)arg[2];
+   uint64_t THREAD_NUM=(uint64_t)arg[1];
+   char *bin=(char *)arg[0];
+   printf("path: %s\n",path );
    gzFile fp = gzopen(path,"r");
    kseq_t *seq=kseq_init(fp);
-   uint64_t i,count;
-   int j;
+   uint64_t i=0,count;
    while(kseq_read(seq)>=0)
    {
-      printf("name: %s\n", seq->name.s);
-      printf("counting the seq length:%ld\n",seq->seq.l);
+      //printf("name: %s (%lu)\n", seq->name.s, i++);
+      //printf("counting the seq length:%ld\n",seq->seq.l);
+      if(seq->seq.l<=32) 
+      {
+  	     fprintf(stderr,"Length <= 32!\n");
+	       exit(1);
+      }
       ref_length+=seq->seq.l;
       countRead++;
    }
+   //printf("countRead=%lu\n",countRead);
+   //exit(0);
    kseq_destroy(seq);
    gzclose(fp);
    fp = gzopen(path,"r");
-   if(fp==NULL) {printf("can not open ref file\n");exit(0);}
+   if(fp==NULL) {fprintf(stderr,"can not open ref file\n");exit(0);}
    seq=kseq_init(fp);
    ref_length+=countRead;//add # and $ to the ref
    BWTLEN=ref_length;//store the bwt length
@@ -45,19 +60,25 @@ int collect(char *path)
    compress_length=ref_length>>5;
    if(ref_length&MOD32) compress_length++;
    reference=(uint64_t*)calloc(compress_length,sizeof(uint64_t));//success free
-   special=(uint64_t*)calloc(countRead,sizeof(uint64_t));//success free
+   special=(uint64_t*)calloc(countRead+1,sizeof(uint64_t));//success free
    uint64_t seg=0;
    count=0;
    while(kseq_read(seq)>=0)
    {
-      printf("name: %s\n", seq->name.s);
+      //printf("name: %s\n", seq->name.s);
       for(i=0;seq->seq.s[i]!='\0';i++,seg++)
       {
-         //if(seq->seq.s[i]=='n') printf("exist n!\n");
-         reference[seg>>5]=reference[seg>>5]|(trans[seq->seq.s[i]]<<((31-(seg&MOD32))<<1));
-         ACGT[trans[seq->seq.s[i]]]++;
+	 /*
+         if(seq->seq.s[i]!='A'&&seq->seq.s[i]!='C'&&seq->seq.s[i]!='G'&&seq->seq.s[i]!='T') 
+ 	 {
+	   printf("%c!\n",seq->seq.s[i]);
+	   exit(1);
+	 }
+	 */
+         reference[seg>>5]=reference[seg>>5]|(trans[(int)(seq->seq.s[i])]<<((31-(seg&MOD32))<<1));
+         ACGT[trans[(int)(seq->seq.s[i])]]++;
       }
-      printf("i=%lu\n",i);
+      //printf("i=%lu\n",i);
       reference[seg>>5]=reference[seg>>5]|(trans['T']<<((31-(seg&MOD32))<<1));
       special[count]=seg;
       seg++;
@@ -79,7 +100,7 @@ int collect(char *path)
    ACGT[0]=0;
    kseq_destroy(seq);
    gzclose(fp);
-   char *refPath=getPath("/reference");
+   char *refPath=getPath(bin,"/reference");
    FILE *pref=fopen(refPath,"wb");
    free(refPath);
    if(pref==NULL)
@@ -89,7 +110,7 @@ int collect(char *path)
    }
    fwrite(reference,sizeof(uint64_t),compress_length,pref);
    fclose(pref);
-   char *specialSAPath=getPath("/specialModule/specialSA");
+   char *specialSAPath=getPath(bin,"/specialSA");
    pref=fopen(specialSAPath,"wb");
    free(specialSAPath);
    fwrite(special,sizeof(uint64_t),countRead,pref);
@@ -106,7 +127,6 @@ int collect(char *path)
     }
    }
    */
-   
    ///////////////////////////collect special SA multi-thread///////////////////////////////////////////
    uint64_t boundLen=countRead/THREAD_NUM;
    pthread_t myThread[THREAD_NUM];
@@ -133,34 +153,31 @@ int collect(char *path)
    {
     pthread_join( myThread[i], NULL);
    }
-
-   qsort(SA,countRead*(KMER_LENGTH+1),sizeof(uint64_t),cmp);
-   //////////////////////////////////////////dbg/////////////////////////////////////////////////// 
-   /*
-   uint64_t *dbgSA=(uint64_t *)calloc(BWTLEN,sizeof(uint64_t));
-   for(i=0;i<BWTLEN;i++) dbgSA[i]=i;
-   qsort(dbgSA,BWTLEN,sizeof(uint64_t),cmp);
-   dbgBWT=(char *)calloc(BWTLEN,sizeof(char));
-   for(i=0;i<BWTLEN;i++)
+   uint64_t temp_capa=countRead*(KMER_LENGTH+1);
+   qsort(SA,temp_capa,sizeof(uint64_t),cmp);
+   //////////////////////////////////////////A dbg module for LF-back search/////////////////////////////
+   
+   specialHash=(uint64_t *)calloc(countRead,sizeof(uint64_t));
+   invHash=(uint64_t *)calloc(countRead,sizeof(uint64_t));
+   uint64_t special_p=0;
+   for(i=0;i<temp_capa;i++)
    {
-      if(dbgSA[i]>0)
+      uint64_t j;
+      for(j=0;j<countRead;j++)
       {
-        dbgBWT[i]=getCharacter(dbgSA[i]-1);
-        if(dbgSA[i]==special[0]) dbgBWT[i]='#';
+         if(special[j]==SA[i])
+         {
+            invHash[j]=special_p;
+            specialHash[special_p++]=j;
+         }
       }
-      else
-      {
-        dbgBWT[i]='$';
-      }
-      printf("%lu: %c\n",i,dbgBWT[i] );
    }
-   free(dbgSA);
-   free(dbgBWT);
+   
    //////////////////////////////////////////////////////////////////////////////////////////////////////
    /*print the kmer of SA*/
-   divideKmer(seeKMER(SA),SA);
+   divideKmer(seeKMER(SA,bin),SA,bin);
    /*
-   ///////////////////////////////////////////RestoreRef///////////////////////////////////////////////////////////
+   ///////////////////////////////////////////RestoreRef/////////////////////////////////////////////////
    clock_t start=clock();
    char restoreBuf[71];
    int pointBuf=0;
@@ -199,10 +216,11 @@ int collect(char *path)
    printf("Restore_Ref time %lf\n",duration);
    //////////////////////////////////////////////////////////////////////////////////////////////////////
    */
+   printf("branchNum=%lu\n",branchNum);
    free(reference);
    free(SA);
    free(special);
-   return 1;
+   return (void *)1;
 }
 void *generateSpecialSA(void *arg)
 {
@@ -217,8 +235,9 @@ void *generateSpecialSA(void *arg)
    }
   }
   free(bound);
+  return (void*)NULL;
 }
-uint64_t convert(uint64_t mark)//get the 32mer of the ref
+uint64_t convert(uint64_t mark)//get the 32 mer of the ref
 {
    uint64_t ref_mark=mark>>5;
    uint64_t move=(mark&MOD32)<<1;
@@ -232,29 +251,14 @@ int cmp(const void *a,const void *b)//the length of each read must longer than 3
 {
    uint64_t mka=*(uint64_t*)a,mkb=*(uint64_t*)b;
    uint64_t checka=BinarySearch(mka,special,countRead-1),checkb=BinarySearch(mkb,special,countRead-1);
-   int64_t cka,ckb;
+   uint64_t cka,ckb;
    uint64_t cva,cvb;
    while((cva=convert(mka))==(cvb=convert(mkb)))
    {
-    if((cka=special[checka]-mka)<=31)//check the # or $ point
+    cka=special[checka]-mka,ckb=special[checkb]-mkb;
+    while((cka<=31)|(ckb<=31))
     {
-      checka++; //move the index of #
-    }
-    else
-    {
-      cka=-1;
-    }
-    if((ckb=special[checkb]-mkb)<=31)
-    {
-      checkb++;
-    }
-    else
-    {
-      ckb=-1;
-    }
-    if(cka>=0||ckb>=0)
-    {
-      printf("cka=%ld,ckb=%ld\n",cka,ckb );
+      //printf("cka=%ld,ckb=%ld\n",cka,ckb );
       if(cka<ckb)//a string is bigger than b
       {
         return 1;
@@ -265,27 +269,40 @@ int cmp(const void *a,const void *b)//the length of each read must longer than 3
       }
       else if(cka==ckb)
       {
-        if(checka==countRead) return 1;//a string is bigger than b
-        else if(checkb==countRead) return -1;//b string is bigger than a
+        if(checka==countRead-1) return 1;//a string is bigger than b
+        else if(checkb==countRead-1) return -1;//b string is bigger than a
+      }
+      if(cka<=31)
+      {
+          checka++;
+          cka=special[checka]-mka;
+      }
+      if(ckb<=31)
+      {
+          checkb++;
+          ckb=special[checkb]-mkb;
       }
     }
     mka+=32;
     mkb+=32;
    }
-   cka=-1,ckb=-1;
-   if((cka=special[checka]-mka)<=31)//check the # or $ point
+   cka=special[checka]-mka,ckb=special[checkb]-mkb;
+   while(cka<=31||ckb<=31)
    {
-     checka++; //move the index of #
-     uint64_t index=cka;
-     if(checka==countRead) cvb=minusDimer(cvb,index,1);
-     else cvb=minusDimer(cvb,index,0); 
-   }
-   if((ckb=special[checkb]-mkb)<=31)
-   {
-     checkb++;
-     uint64_t index=ckb;
-     if(checkb==countRead) cva=minusDimer(cva,index,1);
-     else cva=minusDimer(cva,index,0);
+     if(cka<=31)
+     {
+	checka++; //move the index of #
+	if(checka==countRead) cvb=minusDimer(cvb,cka,1);
+        else cvb=minusDimer(cvb,cka,0); 
+        cka=special[checka]-mka;
+     }          
+     if(ckb<=31)
+     {
+	checkb++;
+        if(checkb==countRead) cva=minusDimer(cva,ckb,1);
+        else cva=minusDimer(cva,ckb,0);
+        ckb=special[checkb]-mkb;
+     }
    }
    return cva>cvb?1:-1;
 }
@@ -308,13 +325,16 @@ uint64_t minusDimer(uint64_t cv,uint64_t index,int flag)//minus the index dimer
   unsigned int move=(31-index)<<1;
   uint64_t dimer=(cv>>move)&3;
   uint64_t res=0;
-  if(flag==0&&dimer>=1)//# minus 1
+  if(dimer>=3)
   {
-    dimer-=1;
-  }
-  else if(flag==1&&dimer>=2)//$ minus 2
-  {
-    dimer-=2;
+    if(flag==0)//# minus 1
+    {
+      dimer-=1;
+    }
+    else if(flag==1)//$ minus 2
+    {
+      dimer-=2;
+    }
   }
   else return cv;
   res=cv&(~((uint64_t)3<<move));
@@ -322,12 +342,12 @@ uint64_t minusDimer(uint64_t cv,uint64_t index,int flag)//minus the index dimer
   return res;
 }
 
-char (*seeKMER(uint64_t *SA))[KMER_LENGTH+1]
+char (*seeKMER(uint64_t *SA, char *bin))[KMER_LENGTH+1]
 {
   uint64_t len=countRead*(KMER_LENGTH+1);
   uint64_t i;
   int j;
-  char *head$Path=getPath("/specialModule/head$");
+  char *head$Path=getPath(bin,"/head$");
   FILE *fp$h=fopen(head$Path,"w");
   free(head$Path);
   uint64_t $h=convert(0);
@@ -373,7 +393,17 @@ char (*seeKMER(uint64_t *SA))[KMER_LENGTH+1]
     pthread_join( myThread[i], NULL);
   }
   */
-  
+  /*
+  uint64_t dbgSeq=0;
+  dbgSeq=dbgSeq|(((uint64_t)1<<62)-1)-3;
+  printf("target:\n");
+  printf("A#");
+  for(j=0;j<29;j++)
+  {
+    printf("%c",dbgStr1040[j]);
+  }
+  putchar('\n');
+  */
   for(i=0;i<len;i++)
   {
     char *kmer=(char *)calloc(KMER_LENGTH+1,sizeof(char));//success free
@@ -409,17 +439,23 @@ char (*seeKMER(uint64_t *SA))[KMER_LENGTH+1]
         }
         else 
         {
-          bwtSA[bwtIndex]=bwtSA[bwtIndex]|(trans[kmer[j]]<<move);
+          bwtSA[bwtIndex]=bwtSA[bwtIndex]|(trans[(int)kmer[j]]<<move);
           if(kmer[j+1]=='#'||kmer[j+1]=='$') flag=1;
         }
       }
+      /*
+      if(bwtSA[bwtIndex]==dbgSeq)
+      {
+        printf("dbgSeq: %c|%s\n",bwt[bwtIndex],kmer);
+      }
+      */
       //decode(bwtSA[bwtIndex]);
       bwtIndex++;
     }
     free(kmer);
   }
   
-  char *bwtPath=getPath("/specialModule/specialBwt");
+  char *bwtPath=getPath(bin,"/specialBwt");
   FILE *fpbwt=fopen(bwtPath,"wb");
   free(bwtPath);
   fwrite(bwt,sizeof(char),countRead*KMER_LENGTH,fpbwt);
@@ -429,87 +465,12 @@ char (*seeKMER(uint64_t *SA))[KMER_LENGTH+1]
   fclose(fpbwt);
   return res;
 }
-/*
-void *multiSeeKmer(void *arg)//This method is wrong, for it cannot use multiThread, desolate it.
+void divideKmer(char (*pK)[KMER_LENGTH+1],uint64_t *SA, char *bin)
 {
-  void **para=(void **)arg;
-  uint64_t *pi=(uint64_t *)para[0];
-  uint64_t num=*pi;
-  free(pi);
-  uint64_t len=(uint64_t)para[1];
-  uint64_t *bwtIndex=(uint64_t *)para[2];
-  char (*res)[KMER_LENGTH+1];
-  res=(char (*)[KMER_LENGTH+1])para[3];
-  char *bwt=(char *)para[4];
-  uint64_t *bwtSA=(uint64_t *)para[5];
-  char kmer[KMER_LENGTH+1];
-  uint64_t segLen=len/THREAD_NUM;
-  uint64_t start=num*segLen,end;
-  if(num<THREAD_NUM-1)
-  {
-    end=(num+1)*segLen;
-  }
-  else
-  {
-    end=len;
-  }
-  uint64_t i;
-  int j,k;
-  //printf("num=%lu, [%lu,%lu]\n",num,start,end );
-  for(i=start;i<end;i++)
-  {
-    //printf("%-10lu",SA[i]);
-    uint64_t temp=convert(SA[i]);
-    uint64_t precursor=(convert(SA[i]-1)>>62)&3;
-    uint64_t check=BinarySearch(SA[i],special,countRead-1);
-    for(j=31,k=0;k<=KMER_LENGTH;j--,k++)
-    {
-      int move=j<<1;
-      uint64_t dimer=(temp>>move)&3;
-      if(SA[i]+k==special[check]) 
-      {
-        if(check<countRead-1) kmer[k]='#';
-        else kmer[k]='$';
-      }
-      else kmer[k]=cis[dimer];
-      res[i][k]=kmer[k];
-    }
-    //printf("i=%lu\n",i );  
-    if(kmer[KMER_LENGTH]!='#'&&kmer[KMER_LENGTH]!='$') //check this 
-    {
-      pthread_mutex_lock( &mutex );
-      bwt[*bwtIndex]=cis[precursor];
-      unsigned int flag=0;
-      if(kmer[0]=='#'||kmer[0]=='$') flag=1;
-      //printf("flag=%d\n",flag);
-      for(j=0,k=31;j<KMER_LENGTH;j++,k--)
-      {
-        unsigned int move=k<<1;
-        if(flag)
-        {
-          bwtSA[*bwtIndex]=bwtSA[*bwtIndex]|((uint64_t)3<<move); //'T'
-        }
-        else 
-        {
-          bwtSA[*bwtIndex]=bwtSA[*bwtIndex]|(trans[kmer[j]]<<move);
-          if(kmer[j+1]=='#'||kmer[j+1]=='$') flag=1;
-        }
-      }
-      decode(bwtSA[*bwtIndex]);
-      printf("bwtIndex=%lu\n",*bwtIndex );
-      (*bwtIndex)++;
-      pthread_mutex_unlock( &mutex );
-    }
-  }
-  free(para);
-}
-*/
-void divideKmer(char (*pK)[KMER_LENGTH+1],uint64_t *SA)//if reads shorter than 32, there will be some mistakes
-{
-  char *headSharpPath=getPath("/specialModule/head#"); // change to binary file
+  char *headSharpPath=getPath(bin,"/head#"); // change to binary file
   FILE *fph=fopen(headSharpPath,"wb");
   free(headSharpPath);
-  char *tailSharpPath=getPath("/specialModule/tail#"); // change to binary file
+  char *tailSharpPath=getPath(bin,"/tail#"); // change to binary file
   FILE *fpt=fopen(tailSharpPath,"wb");
   free(tailSharpPath);
   uint64_t len=countRead*(KMER_LENGTH+1);
@@ -525,7 +486,7 @@ void divideKmer(char (*pK)[KMER_LENGTH+1],uint64_t *SA)//if reads shorter than 3
       for(j=1,k=31;j<=KMER_LENGTH;j++,k--)
       {
         move=k<<1;
-        headBuffer[headI]=headBuffer[headI]|(trans[pK[i][j]]<<move);
+        headBuffer[headI]=headBuffer[headI]|(trans[(int)pK[i][j]]<<move);
         //fprintf(fph, "%c", pK[i][j]);
       }
       headI++;
@@ -543,7 +504,7 @@ void divideKmer(char (*pK)[KMER_LENGTH+1],uint64_t *SA)//if reads shorter than 3
       for(j=0,k=31;j<=KMER_LENGTH-1;j++,k--)
       {
         move=k<<1;
-        tailBuffer[tailI]=tailBuffer[tailI]|(trans[pK[i][j]]<<move);
+        tailBuffer[tailI]=tailBuffer[tailI]|(trans[(int)pK[i][j]]<<move);
         //fprintf(fpt, "%c", pK[i][j]);
       }
       tailI++;
@@ -569,7 +530,7 @@ void divideKmer(char (*pK)[KMER_LENGTH+1],uint64_t *SA)//if reads shorter than 3
   fclose(fpt);
   free(headBuffer);
   free(tailBuffer);
-  char *specialBranchPath=getPath("/specialModule/specialBranch");
+  char *specialBranchPath=getPath(bin,"/specialBranch");
   FILE *specialBranch=fopen(specialBranchPath,"wb");
   free(specialBranchPath);
   uint64_t low=0,up=0;
@@ -620,6 +581,7 @@ void divideKmer(char (*pK)[KMER_LENGTH+1],uint64_t *SA)//if reads shorter than 3
            if(branchI>=BUFFERSIZE)
            {
              fwrite(branchBuffer,sizeof(uint64_t),BUFFERSIZE,specialBranch);
+	     branchNum+=BUFFERSIZE;
              branchI=0;
            }
          }
@@ -631,6 +593,7 @@ void divideKmer(char (*pK)[KMER_LENGTH+1],uint64_t *SA)//if reads shorter than 3
   if(branchI>0)
   {
     fwrite(branchBuffer,sizeof(uint64_t),branchI,specialBranch);
+    branchNum+=branchI;
   }
   free(pK);
   fclose(specialBranch);
@@ -669,10 +632,10 @@ int compareI(uint64_t cva,uint64_t cvb,uint64_t cka,uint64_t ckb,uint64_t checka
   return cva==cvb?1:0;
 }
 
-char *getPath(char *name)
+char *getPath(char *DIR, char *name)
 {
   char *path=(char *)calloc(PATH_LEN,sizeof(char));
-  strcpy(path,PATH);
+  strcpy(path,DIR);
   strcat(path,name);
   return path;
 }

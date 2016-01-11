@@ -1,7 +1,7 @@
 #include "collect#$.h"
 #include "generateSP.h"
 #include "INandOut.h"
-unsigned int *redSeq=NULL;
+uint64_t *redSeq=NULL;
 uint64_t *redPoint=NULL;
 uint64_t *blueTable=NULL;//point to the SP code's index
 uint64_t spCodeLen=0;
@@ -9,39 +9,46 @@ uint64_t *specialBranch=NULL;
 uint64_t *specialSA=NULL;
 uint64_t dbgQue=0;
 uint64_t *splitIndex=NULL;
-uint64_t spSplit[THREAD_NUM],spSplitCapacity[THREAD_NUM];
+uint64_t *spSplit,*spSplitCapacity;
 uint64_t *spCode=NULL;
 pthread_rwlock_t *rwlockRed;
-uint64_t fusionNode[THREAD_NUM];
-uint64_t fusionMod[THREAD_NUM];
-uint64_t *tempSP[THREAD_NUM];
+uint64_t *fusionNode;
+uint64_t *fusionMod;
+uint64_t **tempSP;
 //uint64_t spIndex=0;
-int generateSP(void)
+int generateSP(void **arg)
 {
+	char *bin=(char *)arg[0];
+	uint64_t THREAD_NUM=(uint64_t )arg[1];
+	spSplit=(uint64_t *)calloc(THREAD_NUM,sizeof(uint64_t));
+	spSplitCapacity=(uint64_t *)calloc(THREAD_NUM,sizeof(uint64_t));
+	fusionNode=(uint64_t *)calloc(THREAD_NUM,sizeof(uint64_t));
+	fusionMod=(uint64_t *)calloc(THREAD_NUM,sizeof(uint64_t));
+	tempSP=(uint64_t **)calloc(THREAD_NUM,sizeof(uint64_t*));
 	printf("the case3num is %lu\n", case3num);
 	printf("the blueBoundNum is %lu\n", blueBoundNum);
 	printf("the redCapacity is %lu\n", redCapacity);
 	printf("the blueCapacity is %lu\n", blueCapacity);
-	redSeq=(unsigned int *)calloc(redCapacity,sizeof(unsigned int));
+	redSeq=(uint64_t *)calloc(redCapacity,sizeof(uint64_t));
 	redPoint=(uint64_t *)calloc(redCapacity,sizeof(uint64_t));
 	blueTable=(uint64_t *)calloc(blueCapacity,sizeof(uint64_t));
-	printf("success alloc red\n");
-	char *redSeqPath=getPath("/redSeq");
+	char *redSeqPath=getPath(bin,"/redSeq");
 	FILE *fpredSeq=fopen(redSeqPath,"rb");
-	free(redSeqPath);
-	char *redPointPath=getPath("/redPoint");
+	char *redPointPath=getPath(bin,"/redPoint");
 	FILE *fpredPoint=fopen(redPointPath,"rb");
-	free(redPointPath);
 	if(fpredSeq==NULL||fpredPoint==NULL)
 	{
-		printf("fail to open the red file\n");
+		printf("fail to open the red file!\n");
 		exit(1);
 	}
-	fread(redSeq,sizeof(unsigned int),redCapacity,fpredSeq);
+	fread(redSeq,sizeof(uint64_t),redCapacity,fpredSeq);
 	fread(redPoint,sizeof(uint64_t),redCapacity,fpredPoint);
-	printf("success read red\n");
 	fclose(fpredSeq);
 	fclose(fpredPoint);
+	remove(redPointPath);
+	remove(redSeqPath);
+	free(redPointPath);
+	free(redSeqPath);
 	uint64_t i;
 	for(i=1;i<BLACKCAPACITY;i++)
 	{
@@ -49,26 +56,24 @@ int generateSP(void)
 		{
 			blackTable[i]=blackTable[i-1];
 		}
-	}
+	}	
 	//////////////////////////////go through reference////////////////////////////////////
-	char *refPath=getPath("/reference");
+	char *refPath=getPath(bin,"/reference");
 	FILE *fpRef=fopen(refPath,"rb");
-	free(refPath);
 	if(fpRef==NULL)
 	{
 		printf("fail to open the ref file\n");
 		exit(1);	
 	}
 	reference=(uint64_t *)calloc(compress_length,sizeof(uint64_t)); 
-	printf("success alloc ref\n");
 	fread(reference,sizeof(uint64_t),compress_length,fpRef);
 	fclose(fpRef);
+	remove(refPath);
+	free(refPath);
 	////////////////////////////////////////////////////////////////////////////////////////////////
-	char *specialBranchPath=getPath("/specialModule/specialBranch");
+	char *specialBranchPath=getPath(bin,"/specialBranch");
 	FILE *fpSB=fopen(specialBranchPath,"rb");
-	free(specialBranchPath);
 	specialBranch=(uint64_t *)calloc(specialBranchNum,sizeof(uint64_t));
-	printf("success alloc specialBranch\n");
 	if(fpSB==NULL)
 	{
 		printf("fail to open the specialBranch file\n");
@@ -82,12 +87,12 @@ int generateSP(void)
 	*/
 	fread(specialBranch,sizeof(uint64_t),specialBranchNum,fpSB);
 	fclose(fpSB);
+	remove(specialBranchPath);
+	free(specialBranchPath);
 	qsort(specialBranch,specialBranchNum,sizeof(uint64_t),ascend);
-	printf("success qsort\n");
 	specialSA=(uint64_t *)calloc(countRead,sizeof(uint64_t));
-	char *specialSAPath=getPath("/specialModule/specialSA");
+	char *specialSAPath=getPath(bin,"/specialSA");
 	FILE *fpSpecialSA=fopen(specialSAPath,"rb");
-	free(specialSAPath);
 	if(fpSpecialSA==NULL)
 	{
 		printf("fail to open the specialBranch file\n");
@@ -95,17 +100,19 @@ int generateSP(void)
 	}
 	fread(specialSA,sizeof(uint64_t),countRead,fpSpecialSA);
 	fclose(fpSpecialSA);
+	remove(specialSAPath);
+	free(specialSAPath);
+	///////////////////////////////////split the ref first//////////////////////////////////////////
 	splitIndex=(uint64_t *)calloc(THREAD_NUM+1,sizeof(uint64_t));
 	splitIndex[0]=0;
 	splitIndex[THREAD_NUM]=BWTLEN;
 	pthread_t myThread[THREAD_NUM];
-	
-	///////////////////////////////////split the ref first//////////////////////////////////////////
 	for(i=1;i<THREAD_NUM;i++)
 	{
-		int *temp=(int *)calloc(1,sizeof(int));
-		*temp=i;
-		int check=pthread_create( &myThread[i-1], NULL, multiGenerateSplit, (void*)temp);
+		void **tt=(void **)calloc(2,sizeof(void *));
+		tt[0]=(void *)i;
+		tt[1]=(void *)THREAD_NUM;
+		int check=pthread_create( &myThread[i-1], NULL, multiGenerateSplit, (void*)tt);
 		if(check)
     	{
         	fprintf(stderr,"threadNum:%lu, Error - pthread_create() return code: %d\n",i,check);
@@ -115,10 +122,6 @@ int generateSP(void)
 	for(i=1;i<THREAD_NUM;i++)
 	{
 		pthread_join( myThread[i-1], NULL);
-	}
-	for(i=0;i<=THREAD_NUM;i++)
-	{
-		printf("splitIndex=%lu\n",splitIndex[i] );
 	}
 	//////////////////////////////////multi-thread generate spcode////////////////////////////////////
 	rwlockRed=(pthread_rwlock_t*)calloc(redCapacity,sizeof(pthread_rwlock_t));
@@ -132,9 +135,10 @@ int generateSP(void)
 	}
 	for(i=0;i<THREAD_NUM;i++)
 	{
-		int *temp=(int *)calloc(1,sizeof(int));
-		*temp=i;
-		int check=pthread_create( &myThread[i], NULL, multiGenerateSP, (void*)temp);
+		void **tt=(void **)calloc(2,sizeof(void *));
+		tt[0]=(void *)i;
+		tt[1]=(void *)bin;
+		int check=pthread_create( &myThread[i], NULL, multiGenerateSP, (void*)tt);
 		if(check)
     	{
         	fprintf(stderr,"threadNum:%lu, Error - pthread_create() return code: %d\n",i,check);
@@ -151,243 +155,20 @@ int generateSP(void)
 		spSplitCapacity[i]=spSplit[i];
 		spSplit[i]=spSplit[i]+spSplit[i-1];
 	}
-	for(i=0;i<THREAD_NUM;i++)
-	{
-		printf("split sp %lu: %lu\n",i,spSplit[i] );
-	}
 	free(rwlockRed);
-	
-	/////////////////////////use two point to generate SP code////////////////////////////
-	/*
-	uint64_t specialSApoint=0,branchPoint=0;
-	uint64_t bufferSize=BUFFERSIZE;
-	uint64_t *myQueue=NULL;
-	myQueue=(uint64_t *)calloc(bufferSize,sizeof(uint64_t));//stand for the red index
-	if(NULL==myQueue)
-	{
-		printf("fail to alloc myQueue\n");
-		exit(1);
-	}
-	char *bwtQueue=(char *)calloc(bufferSize,sizeof(char));//store in the blue table
-	if(NULL==bwtQueue)
-	{
-		printf("fail to alloc bwtQueue\n");
-		exit(1);
-	}
-	uint64_t qup=0;
-	uint64_t *spCodeBuf=(uint64_t *)calloc(bufferSize,sizeof(uint64_t));
-	if(NULL==spCodeBuf)
-	{
-		printf("fail to alloc spCodeBuf\n");
-		exit(1);
-	}
-	uint64_t spBufPoint=0,spIndex=0;
-	uint64_t *spSpecialbuf=(uint64_t *)calloc(bufferSize,sizeof(uint64_t));
-	if(NULL==spSpecialbuf)
-	{
-		printf("fail to alloc spSpecialbuf\n");
-		exit(1);
-	}
-	uint64_t spSpecialPoint=0;
-	uint64_t queueSize=bufferSize;
-	char *spPath=getPath("/SPcode");
-	FILE *fpSP=fopen(spPath,"wb");
-	free(spPath);
-	char *spSpecialIndexPath=getPath("/spSpecialIndex");
-	FILE *fpspSpecial=fopen(spSpecialIndexPath,"wb");
-	free(spSpecialIndexPath);
-	printf("generate sp code\n");
-	for(i=0;i<BWTLEN;i++)
-	{
-		unsigned int multioutFlag=0;
-		unsigned int multiinFlag=0;
-		//check whether is multiout or not
-		uint64_t distance=specialSA[specialSApoint]-i;
-		if(distance>=KMER_LENGTH)// use the main module, for kmer info was stored in it
-		{
-			uint64_t checkSeq=convert(i)>>((32-KMER_LENGTH)<<1);
-			unsigned int formerSeq=checkSeq>>(REDLEN<<1);
-			unsigned int latterSeq=(checkSeq&REDEXTRACT);
-			uint64_t redLen;
-			//operation to check multiout, use hash
-			if(formerSeq>0)
-			{
-				redLen=blackTable[formerSeq]-blackTable[formerSeq-1];
-			}
-			else
-			{
-				redLen=blackTable[0];
-			}
-			if(redLen>0)
-			{
-				//binary search
-				uint64_t startPoint=blackTable[formerSeq]-redLen;
-				unsigned int *searchRedSeq=&redSeq[startPoint];
-				uint64_t candidate=BinarySearch_unsigned(latterSeq,searchRedSeq,redLen-1);
-				if(candidate<redLen)
-				{
-					if((searchRedSeq[candidate]>>2)==latterSeq)
-					{
-						// Then we can judge whether it is multiout
-						unsigned int tempFlag=searchRedSeq[candidate]&3;
-						multioutFlag=tempFlag&1;
-						multiinFlag=tempFlag>>1;
-						if(multiinFlag)
-						{
-							//put the index of red table into the queue
-							//put the bwt of red table into bwt queue
-							dbgQue++;
-							if(qup>=queueSize)
-							{
-								queueSize=(queueSize<<1);
-								printf("realloc ...\n");
-								myQueue=realloc(myQueue,queueSize*sizeof(uint64_t));
-								printf("success realloc queue\n");
-								bwtQueue=realloc(bwtQueue,queueSize*sizeof(char));
-								printf("success realloc bwtQueue\n");
-							}
-							myQueue[qup]=startPoint+candidate;
-							//record the previous character
-							if(specialSApoint>0)
-							{
-								if(specialSA[specialSApoint-1]+1==i)
-								{
-									bwtQueue[qup]='#';//stand for #
-								}
-								else
-								{
-									bwtQueue[qup]=getCharacter(i-1);//get the precursor of i
-								}
-							}
-							else
-							{
-								if(0==i)
-								{
-									bwtQueue[qup]='$';//stand for $
-								}
-								else
-								{
-									bwtQueue[qup]=getCharacter(i-1);//get the precursor of i
-								}
-							}
-							//printf("qup=%lu\n",qup);
-							qup++;
-						}
-					}
-				}
-			}
-		}
-		else// use the special module
-		{
-			if(distance==0)
-			{
-				specialSApoint++;
-			}
-			//operation to check multiout, use specialBranch
-			if(branchPoint<specialBranchNum&&specialBranch[branchPoint]==i)
-			{
-				multioutFlag=1;
-				branchPoint++;
-			}
-		}
-		////////////////////////////end check multiout/////////////////////////////////
-		if(multioutFlag)
-		//if(multioutFlag&&qup>0)//If there is no multi-in for this multi-out, then needn't this spcode
-		{
-			//get the SP code's characters
-			char tempSP;
-			if(distance==KMER_LENGTH)
-			{
-				//sp code only use 2 bits.
-				tempSP='T';
-				spSpecialbuf[spSpecialPoint++]=spIndex;
-				printf("# in spCode:%lu\n",spIndex );
-				if(spSpecialPoint>=bufferSize)
-				{
-					//fwrite the spSpecial into the file
-					fwrite(spSpecialbuf,sizeof(uint64_t),bufferSize,fpspSpecial);
-					spSpecialPoint=0;
-				}
-			}
-			else
-			{
-				tempSP=getCharacter(i+KMER_LENGTH);
-			}
-			//printf("%lu: SP:%c\n",spBufPoint,tempSP );
-			uint64_t lowBound=spBufPoint>>5;
-			uint64_t lowMod=spBufPoint&MOD32;
-			unsigned int move=(31-lowMod)<<1;
-			spCodeBuf[lowBound]=spCodeBuf[lowBound]|(trans[tempSP]<<move);//store the sp code
-			spBufPoint++;
-			if((spBufPoint>>5)==bufferSize)
-			{
-				//fwrite the sp code into the file
-				spCodeLen+=spBufPoint;
-				fwrite(spCodeBuf,sizeof(uint64_t),bufferSize,fpSP);
-				free(spCodeBuf);
-				spCodeBuf=(uint64_t *)calloc(bufferSize,sizeof(uint64_t));
-				spBufPoint=0;
-			}
-			//pop the queue and generate the SP code. Fill the blue table.
-			while(qup)
-			{
-				qup--;
-				//pop
-				uint64_t tempBlueChar=trans[bwtQueue[qup]];//precursor character store in low position
-				uint64_t redIndex=myQueue[qup];
-				blueTable[redPoint[redIndex]]=tempBlueChar|(spIndex<<4);
-				//if(tempBlueChar<4) dbgACGT[tempBlueChar]++,dbgACGT3[tempBlueChar]++;
-                redPoint[redIndex]--;
-			}
-			spIndex++;
-		}
-	}
-	if(spSpecialPoint>0)
-	{
-		fwrite(spSpecialbuf,sizeof(uint64_t),spSpecialPoint,fpspSpecial);
-	}
-	if(spBufPoint>0)
-	{
-		uint64_t lowBound=spBufPoint>>5;
-		uint64_t lowMod=spBufPoint&MOD32;
-		if(lowMod) lowBound++;
-		fwrite(spCodeBuf,sizeof(uint64_t),lowBound,fpSP);
-		spCodeLen+=spBufPoint;
-	}
-	printf("SPcode length is %lu\n",spCodeLen );
-	printf("SPindex is %lu\n",spIndex );
-	if(spSpecialbuf!=NULL)	free(spSpecialbuf);
-	printf("success free spSpecialbuf\n");
-	if(spCodeBuf!=NULL)	free(spCodeBuf);
-	printf("success free spCodeBuf\n");
-	if(bwtQueue!=NULL)	free(bwtQueue);
-	printf("success free bwtQueue\n");
-	if(myQueue!=NULL)	free(myQueue);
-	printf("success free myQueue\n");
-	fclose(fpSP);
-	fclose(fpspSpecial);
-	*/
-	printf("start free reference\n");
 	free(reference);
-	printf("success free reference\n");
 	free(specialSA);
-	printf("success free specialSA\n");
 	free(specialBranch);
-	printf("success free specialBranch\n");
 	free(redSeq);
-	printf("success free redSeq\n");
 	free(redPoint);
-	printf("success free redPoint\n");
 	free(blackTable);
-	printf("success free blackTable\n");
-	
-	
 	/////////////////////////////////add seg to the blue table and special sp index////////////////////
 	for(i=1;i<THREAD_NUM;i++)
 	{
-		int *temp=(int *)calloc(1,sizeof(int));
-		*temp=i;
-		int check=pthread_create( &myThread[i], NULL, multiAddSeg, (void*)temp);
+		void **tt=(void **)calloc(2,sizeof(void *));
+		tt[0]=(void *)i;
+		tt[1]=(void *)bin;
+		int check=pthread_create( &myThread[i], NULL, multiAddSeg, (void*)tt);
 		if(check)
     	{
         	fprintf(stderr,"threadNum:%lu, Error - pthread_create() return code: %d\n",i,check);
@@ -399,59 +180,62 @@ int generateSP(void)
 	{
 		pthread_join( myThread[i], NULL);
 	}
-	char *spSpecialIndexPath=getPath("/spSpecialIndex");
+	char *spSpecialIndexPath=getPath(bin,"/spSpecialIndex");
 	FILE *fpspSpecial=fopen(spSpecialIndexPath,"wb");
 	free(spSpecialIndexPath);
-	spSpecialIndexPath=getPath("/spSpecialIndex0");
+	spSpecialIndexPath=getPath(bin,"/spSpecialIndex0");
 	FILE *fpspSpecial0=fopen(spSpecialIndexPath,"rb");
-	free(spSpecialIndexPath);
 	uint64_t *readBuf=(uint64_t *)calloc(BUFFERSIZE,sizeof(uint64_t)),bufReadNum;
 	while((bufReadNum=fread(readBuf,sizeof(uint64_t),BUFFERSIZE,fpspSpecial0))>0)
 	{
 		fwrite(readBuf,sizeof(uint64_t),bufReadNum,fpspSpecial);
 	}
+	remove(spSpecialIndexPath);
+	free(spSpecialIndexPath);
 	fclose(fpspSpecial0);
 	for(i=1;i<THREAD_NUM;i++)
 	{
-		int num=i;
 		char cNum[4];
-		sprintf(cNum,"%d",num);
+		sprintf(cNum,"%lu",i);
 		char spSpecialName[30]="/spSpecialIndexAdded";
 		strcat(spSpecialName,cNum);
-		spSpecialIndexPath=getPath(spSpecialName);
+		spSpecialIndexPath=getPath(bin,spSpecialName);
 		fpspSpecial0=fopen(spSpecialIndexPath,"rb");
-		free(spSpecialIndexPath);
 		while((bufReadNum=fread(readBuf,sizeof(uint64_t),BUFFERSIZE,fpspSpecial0))>0)
 		{
 			fwrite(readBuf,sizeof(uint64_t),bufReadNum,fpspSpecial);
 		}
+		remove(spSpecialIndexPath);
+		free(spSpecialIndexPath);
 		fclose(fpspSpecial0);
 	}
 	fclose(fpspSpecial);
 	free(readBuf);
-	//////////////////////////connect the sp codes///////////////////////////////////////////////
+       	//////////////////////////connect the sp codes///////////////////////////////////////////////
 	spCodeLen=spSplit[THREAD_NUM-1];
 	spCodeLen+=32;
     uint64_t spCodeSpace=spCodeLen>>5;
     uint64_t spLenMod=spCodeLen&MOD32;
     if(spLenMod) spCodeSpace++;
     spCode=(uint64_t *)calloc(spCodeSpace,sizeof(uint64_t));
-	spSpecialIndexPath=getPath("/SPcode0");
+	spSpecialIndexPath=getPath(bin,"/SPcode0");
 	fpspSpecial=fopen(spSpecialIndexPath,"rb");//just used as temp paramater.
-	free(spSpecialIndexPath);
 	uint64_t capacity0=spSplitCapacity[0];
 	uint64_t space0=capacity0>>5;
 	space0++;
 	bufReadNum=fread(spCode,sizeof(uint64_t),space0,fpspSpecial);
-	if(bufReadNum!=space0) printf("alert! bufReadNum=%lu, space0=%lu\n",bufReadNum,space0 );
+	remove(spSpecialIndexPath);
+	free(spSpecialIndexPath);
+	if(bufReadNum!=space0) fprintf(stderr,"alert! bufReadNum=%lu, space0=%lu\n",bufReadNum,space0 ),exit(1);
 	fclose(fpspSpecial);
 	fusionNode[0]=spCode[space0-1];
 	fusionMod[0]=capacity0&MOD32;
 	for(i=1;i<THREAD_NUM;i++)
 	{
-		int *temp=(int *)calloc(1,sizeof(int));
-		*temp=i;
-		int check=pthread_create( &myThread[i], NULL, multiCatSP, (void*)temp);
+		void **tt=(void **)calloc(2,sizeof(void *));
+		tt[0]=(void *)i;
+		tt[1]=(void *)bin;
+		int check=pthread_create( &myThread[i], NULL, multiCatSP, (void*)tt);
 		if(check)
     	{
         	fprintf(stderr,"threadNum:%lu, Error - pthread_create() return code: %d\n",i,check);
@@ -464,9 +248,10 @@ int generateSP(void)
 	}
 	for(i=1;i<THREAD_NUM;i++)
 	{
-		int *temp=(int *)calloc(1,sizeof(int));
-		*temp=i;
-		int check=pthread_create( &myThread[i], NULL, multiConnect, (void*)temp);
+		void **tt=(void **)calloc(2,sizeof(void *));
+		tt[0]=(void *)i;
+		tt[1]=(void *)bin;
+		int check=pthread_create( &myThread[i], NULL, multiConnect, (void*)tt);
 		if(check)
     	{
         	fprintf(stderr,"threadNum:%lu, Error - pthread_create() return code: %d\n",i,check);
@@ -479,12 +264,18 @@ int generateSP(void)
 	}
 	uint64_t space=spSplit[THREAD_NUM-1]>>5;
 	spCode[space]=fusionNode[THREAD_NUM-1];	
+	free(spSplit);
+	free(spSplitCapacity);
+	free(fusionNode);
+	free(fusionMod);
 	return 1;
 }
 void *multiGenerateSplit(void *arg)
 {
-	int num=*(int *)arg;
-	free((int *)arg);
+	void **argT=(void **)arg;
+	uint64_t num=(uint64_t )argT[0];
+	uint64_t THREAD_NUM=(uint64_t)argT[1];
+	free(argT);
 	uint64_t segment=BWTLEN/THREAD_NUM;
 	uint64_t start=num*segment,i;
 	uint64_t specialSApoint,branchPoint;
@@ -493,14 +284,13 @@ void *multiGenerateSplit(void *arg)
 	for(i=start;i<BWTLEN;i++)
 	{
 		unsigned int multioutFlag=0;
-		unsigned int multiinFlag=0;
 		//check whether is multiout or not
 		uint64_t distance=specialSA[specialSApoint]-i;
 		if(distance>=KMER_LENGTH)// use the main module, for kmer info was stored in it
 		{
 			uint64_t checkSeq=convert(i)>>((32-KMER_LENGTH)<<1);
 			unsigned int formerSeq=checkSeq>>(REDLEN<<1);
-			unsigned int latterSeq=(checkSeq&REDEXTRACT);
+			uint64_t latterSeq=(checkSeq&REDEXTRACT);
 			uint64_t redLen;
 			//operation to check multiout, use hash
 			if(formerSeq>0)
@@ -515,8 +305,8 @@ void *multiGenerateSplit(void *arg)
 			{
 				//binary search
 				uint64_t startPoint=blackTable[formerSeq]-redLen;
-				unsigned int *searchRedSeq=&redSeq[startPoint];
-				uint64_t candidate=BinarySearch_unsigned(latterSeq,searchRedSeq,redLen-1);
+				uint64_t *searchRedSeq=&redSeq[startPoint];
+				uint64_t candidate=BinarySearch_red(latterSeq,searchRedSeq,redLen-1);
 				if(candidate<redLen)
 				{
 					if((searchRedSeq[candidate]>>2)==latterSeq)
@@ -524,7 +314,6 @@ void *multiGenerateSplit(void *arg)
 						// Then we can judge whether it is multiout
 						unsigned int tempFlag=searchRedSeq[candidate]&3;
 						multioutFlag=tempFlag&1;
-						multiinFlag=tempFlag>>1;
 					}
 				}
 			}
@@ -548,20 +337,23 @@ void *multiGenerateSplit(void *arg)
 			break;
 		}
 	}
+	return (void *)NULL;
 }
 void *multiCatSP(void *arg)
 {
-	int num=*(int *)arg;
-	free((int *)arg);
+	void **argT=(void **)arg;
+	uint64_t num=(uint64_t )(argT[0]);
+	char *bin=(char *)(argT[1]);
+	free(argT);
 	char cNum[4];
-	sprintf(cNum,"%d",num);	
+	sprintf(cNum,"%lu",num);	
 	uint64_t startPoint=spSplit[num-1];
 	uint64_t space=spSplitCapacity[num]>>5;
 	space++;
 	tempSP[num]=(uint64_t *)calloc(space,sizeof(uint64_t));
 	char spName[12]="/SPcode";
 	strcat(spName,cNum);
-	char *spPath=getPath(spName);
+	char *spPath=getPath(bin,spName);
 	FILE *fpSP=fopen(spPath,"rb");
 	free(spPath);
 	fread(tempSP[num],sizeof(uint64_t),space,fpSP);
@@ -581,12 +373,15 @@ void *multiCatSP(void *arg)
 		tempNode=tempSP[num][space-1]<<(pledge<<1);
 	}
 	fusionNode[num]=tempNode;
+	return (void *)NULL;
 }
 
 void *multiConnect(void *arg)
 {
-	int num=*(int *)arg;
-	free((int *)arg);
+	void **argT=(void **)arg;
+	uint64_t num=(uint64_t )(argT[0]);
+	char *bin=(char *)(argT[1]);
+	free(argT);
 	uint64_t start=spSplit[num-1]>>5, end=spSplit[num]>>5;
 	uint64_t i,pointSP=0,recurTemp=fusionNode[num-1];//use the node we prepared before
 	unsigned int move=fusionMod[num-1]<<1;
@@ -608,26 +403,35 @@ void *multiConnect(void *arg)
 			spCode[i]=tempSP[num][pointSP];
 		}
 	}
+	char spName[12]="/SPcode";
+	char cNum[4];
+	sprintf(cNum,"%lu",num);
+	strcat(spName,cNum);
+	char *spPath=getPath(bin,spName);
+	remove(spPath);
+	free(spPath);
 	free(tempSP[num]);
+	return (void *)NULL;
 }
 
 void *multiAddSeg(void *arg)
 {
-	int num=*(int *)arg;
-	free((int *)arg);
+	void **argT=(void **)arg;
+	uint64_t num=(uint64_t )(argT[0]);
+	char *bin=(char *)(argT[1]);
+	free(argT);
 	char cNum[4];
-	sprintf(cNum,"%d",num);
+	sprintf(cNum,"%lu",num);
 	uint64_t bufferSize=BUFFERSIZE;
-	char spSpecialName[30]="/spSpecialIndex";
-	strcat(spSpecialName,cNum);
-	char *spSpecialIndexPath=getPath(spSpecialName);
-	FILE *fpspSpecial=fopen(spSpecialIndexPath,"rb");
-	free(spSpecialIndexPath);
 	char spSpecialNameAdded[30]="/spSpecialIndexAdded";
 	strcat(spSpecialNameAdded,cNum);
-	spSpecialIndexPath=getPath(spSpecialNameAdded);
+	char *spSpecialIndexPath=getPath(bin,spSpecialNameAdded);
 	FILE *fpspSpecialAdded=fopen(spSpecialIndexPath,"wb");
 	free(spSpecialIndexPath);
+	char spSpecialName[30]="/spSpecialIndex";
+	strcat(spSpecialName,cNum);
+	spSpecialIndexPath=getPath(bin,spSpecialName);
+	FILE *fpspSpecial=fopen(spSpecialIndexPath,"rb");
 	uint64_t *readBuf=(uint64_t *)calloc(bufferSize,sizeof(uint64_t));
 	uint64_t bufReadNum,i;
 	while((bufReadNum=fread(readBuf,sizeof(uint64_t),bufferSize,fpspSpecial))>0)
@@ -640,11 +444,12 @@ void *multiAddSeg(void *arg)
 	}
 	fclose(fpspSpecial);
 	fclose(fpspSpecialAdded);
+	remove(spSpecialIndexPath);
+	free(spSpecialIndexPath);
 	char addBlueSegName[30]="/addBlueSeg";//the indexes has been stored out
 	strcat(addBlueSegName,cNum);
-	char *addBlueSegPath=getPath(addBlueSegName);
+	char *addBlueSegPath=getPath(bin,addBlueSegName);
 	FILE *fpAddBlueSeg=fopen(addBlueSegPath,"rb");
-	free(addBlueSegPath);
 	while((bufReadNum=fread(readBuf,sizeof(uint64_t),bufferSize,fpAddBlueSeg))>0)
 	{
 		for(i=0;i<bufReadNum;i++)
@@ -658,34 +463,38 @@ void *multiAddSeg(void *arg)
 	}
 	fclose(fpAddBlueSeg);
 	free(readBuf);
+	remove(addBlueSegPath);
+	free(addBlueSegPath);
+	return (void *)NULL;
 }
 
 void *multiGenerateSP(void *arg)
 {
-	int num=*(int *)arg;
-	free((int *)arg);
+	void **argT=(void **)arg;
+	uint64_t num=(uint64_t )(argT[0]);
+	char *bin=(char *)(argT[1]);
+	free(argT);
 	uint64_t bufferSize=BUFFERSIZE;
 	uint64_t queueSize=bufferSize;
 	uint64_t start=splitIndex[num],end=splitIndex[num+1];
 	uint64_t i;
 	uint64_t spIndex=0;
 	char cNum[4];
-	sprintf(cNum,"%d",num);
+	sprintf(cNum,"%lu",num);
 	char spName[12]="/SPcode";
 	strcat(spName,cNum);
-	char *spPath=getPath(spName);
+	char *spPath=getPath(bin,spName);
 	FILE *fpSP=fopen(spPath,"wb");
 	free(spPath);
 	char spSpecialName[30]="/spSpecialIndex";
 	strcat(spSpecialName,cNum);
-	char *spSpecialIndexPath=getPath(spSpecialName);
+	char *spSpecialIndexPath=getPath(bin,spSpecialName);
 	FILE *fpspSpecial=fopen(spSpecialIndexPath,"wb");
 	free(spSpecialIndexPath);
 	char addBlueSegName[30]="/addBlueSeg";//the indexes has been stored out
 	strcat(addBlueSegName,cNum);
-	char *addBlueSegPath=getPath(addBlueSegName);
+	char *addBlueSegPath=getPath(bin,addBlueSegName);
 	FILE *fpAddBlueSeg=fopen(addBlueSegPath,"wb");
-	free(addBlueSegPath);
 	uint64_t *addBlueSegBuf=NULL,addBlueSegIndex=0; //used to store seg bonus
 	if(num!=0)
 	{
@@ -696,7 +505,7 @@ void *multiGenerateSP(void *arg)
 	uint64_t qup=0;
 	specialSApoint=BinarySearch(start,specialSA,countRead-1);
 	branchPoint=BinarySearch(start,specialBranch,specialBranchNum-1);
-	printf("specialSApoint=%lu,branchPoint=%lu\n",specialSApoint,branchPoint);
+	//printf("specialSApoint=%lu,branchPoint=%lu\n",specialSApoint,branchPoint);
 	uint64_t *myQueue=(uint64_t *)calloc(bufferSize,sizeof(uint64_t));//stand for the red index
 	if(NULL==myQueue)
 	{
@@ -721,7 +530,7 @@ void *multiGenerateSP(void *arg)
 		printf("fail to alloc spSpecialbuf\n");
 		exit(1);
 	}
-	printf("start:%lu, end:%lu\n",start,end );
+	//printf("start:%lu, end:%lu\n",start,end );
 	for(i=start;i<end;i++)
 	{
 		unsigned int multioutFlag=0;
@@ -732,7 +541,7 @@ void *multiGenerateSP(void *arg)
 		{
 			uint64_t checkSeq=convert(i)>>((32-KMER_LENGTH)<<1);
 			unsigned int formerSeq=checkSeq>>(REDLEN<<1);
-			unsigned int latterSeq=(checkSeq&REDEXTRACT);
+			uint64_t latterSeq=(checkSeq&REDEXTRACT);
 			uint64_t redLen;
 			//operation to check multiout, use hash
 			if(formerSeq>0)
@@ -747,8 +556,8 @@ void *multiGenerateSP(void *arg)
 			{
 				//binary search
 				uint64_t startPoint=blackTable[formerSeq]-redLen;
-				unsigned int *searchRedSeq=&redSeq[startPoint];
-				uint64_t candidate=BinarySearch_unsigned(latterSeq,searchRedSeq,redLen-1);
+				uint64_t *searchRedSeq=&redSeq[startPoint];
+				uint64_t candidate=BinarySearch_red(latterSeq,searchRedSeq,redLen-1);
 				if(candidate<redLen)
 				{
 					if((searchRedSeq[candidate]>>2)==latterSeq)
@@ -764,11 +573,11 @@ void *multiGenerateSP(void *arg)
 							if(qup>=queueSize)
 							{
 								queueSize=(queueSize<<1);
-								printf("realloc ...\n");
+								printf("realloc queue...\n");
 								myQueue=realloc(myQueue,queueSize*sizeof(uint64_t));
-								printf("success realloc queue\n");
+								//printf("success realloc queue\n");
 								bwtQueue=realloc(bwtQueue,queueSize*sizeof(char));
-								printf("success realloc bwtQueue\n");
+								//printf("success realloc bwtQueue\n");
 							}
 							myQueue[qup]=startPoint+candidate;
 							//record the previous character
@@ -794,7 +603,6 @@ void *multiGenerateSP(void *arg)
 									bwtQueue[qup]=getCharacter(i-1);//get the precursor of i
 								}
 							}
-							//printf("qup=%lu\n",qup);
 							qup++;
 						}
 					}
@@ -816,7 +624,6 @@ void *multiGenerateSP(void *arg)
 		}
 		////////////////////////////end check multiout/////////////////////////////////
 		if(multioutFlag)
-		//if(multioutFlag&&qup>0)//If there is no multi-in for this multi-out, then needn't this spcode
 		{
 			//get the SP code's characters
 			char tempSP;
@@ -825,7 +632,7 @@ void *multiGenerateSP(void *arg)
 				//sp code only use 2 bits.
 				tempSP='T';
 				spSpecialbuf[spSpecialPoint++]=spIndex;
-				printf("# in spCode:%lu\n",spIndex );
+				//printf("# in spCode:%lu\n",spIndex );
 				if(spSpecialPoint>=bufferSize)
 				{
 					//fwrite the spSpecial into the file
@@ -841,7 +648,7 @@ void *multiGenerateSP(void *arg)
 			uint64_t lowBound=spBufPoint>>5;
 			uint64_t lowMod=spBufPoint&MOD32;
 			unsigned int move=(31-lowMod)<<1;
-			spCodeBuf[lowBound]=spCodeBuf[lowBound]|(trans[tempSP]<<move);//store the sp code
+			spCodeBuf[lowBound]=spCodeBuf[lowBound]|(trans[(int)tempSP]<<move);//store the sp code
 			spBufPoint++;
 			if((spBufPoint>>5)==bufferSize)
 			{
@@ -856,10 +663,11 @@ void *multiGenerateSP(void *arg)
 			{
 				qup--;
 				//pop
-				uint64_t tempBlueChar=trans[bwtQueue[qup]];//precursor character store in low position
+				uint64_t tempBlueChar=trans[(int)bwtQueue[qup]];//precursor character store in low position
 				uint64_t redIndex=myQueue[qup];
+                                uint64_t blueTemp=tempBlueChar|(spIndex<<4);
 				pthread_rwlock_wrlock(&rwlockRed[redIndex]);
-				blueTable[redPoint[redIndex]]=tempBlueChar|(spIndex<<4);
+				blueTable[redPoint[redIndex]]=blueTemp;
 				if(num!=0) addBlueSegBuf[addBlueSegIndex++]=redPoint[redIndex];
 				redPoint[redIndex]--;
 				pthread_rwlock_unlock(&rwlockRed[redIndex]);
@@ -888,20 +696,18 @@ void *multiGenerateSP(void *arg)
 		if(lowMod) lowBound++;
 		fwrite(spCodeBuf,sizeof(uint64_t),lowBound,fpSP);
 	}
-	printf("SPindex is %lu\n",spIndex );
 	spSplit[num]=spIndex;
 	if(spSpecialbuf!=NULL)	free(spSpecialbuf);
-	printf("success free spSpecialbuf\n");
 	if(spCodeBuf!=NULL)	free(spCodeBuf);
-	printf("success free spCodeBuf\n");
 	if(bwtQueue!=NULL)	free(bwtQueue);
-	printf("success free bwtQueue\n");
 	if(myQueue!=NULL)	free(myQueue);
-	printf("success free myQueue\n");
+	if(num==0) remove(addBlueSegPath);
+	free(addBlueSegPath);
 	free(addBlueSegBuf);
 	fclose(fpSP);
 	fclose(fpspSpecial);
 	fclose(fpAddBlueSeg);
+	return (void *)NULL;
 }
 
 int ascend(const void *a, const void *b)
@@ -916,13 +722,13 @@ char getCharacter(uint64_t index)
 	uint64_t res=(reference[ref_mark]>>move)&3;
 	return "ACGT"[res];
 }
-uint64_t BinarySearch_unsigned(unsigned int mk, unsigned int *target, int64_t up)
+uint64_t BinarySearch_red(uint64_t mk, uint64_t *target, int64_t up)
 {
   int64_t low=0,mid=0;
   while(low<=up)
   {
      mid=(low+up)>>1;
-     unsigned int temp=target[mid]>>2;
+     uint64_t temp=target[mid]>>2;
      if(mk<temp)   up=mid-1;
      else if(mk>temp)   low=mid+1;
      if(mk==temp)    return mid;
