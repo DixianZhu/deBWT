@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     char *obj=NULL;
     char *bin=get_bin_dir(argv[0]);
     char *jRoot=NULL;
-    uint64_t THREAD_NUM=32;
+    uint64_t THREAD_NUM=8;
     int i;
     for(i=1;i<argc-1;i+=2)
     {
@@ -171,7 +171,7 @@ void usage(void)
     fprintf(stderr,"deBWT [options] reference\n");
     fprintf(stderr, "options:\n" );
     fprintf(stderr, "-o: output bwt file(binary)\n");
-    fprintf(stderr, "-t: maximum thread number(default 32)\n" );
+    fprintf(stderr, "-t: maximum thread number(default 8)\n" );
     fprintf(stderr, "-j: jellyfish directory\n" );
     fprintf(stderr, "reference: sequence in fasta or fastq format\n");
 }
