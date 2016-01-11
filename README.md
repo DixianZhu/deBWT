@@ -34,10 +34,12 @@
 ## Usage: ##
 
 - ./deBWT [options] input_sequence
+
 ### options: ###
 - -t: number of thread (default: 8)
 - -o: bwt string output file
 - -j: the directory of jellyfish
+
 ### input_sequence: ###
 
 - the sequence to be indexed, should be in fasta format
