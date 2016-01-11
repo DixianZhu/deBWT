@@ -1,7 +1,0 @@
-#!/bin/sh
-/usr/local/bin/jellyfish count  -m 32 -o /dupa-filer/bo/ManyBWT_Datasets/project1.24/output -c 40 -s 4G -t 32 /dupa-filer/bo/ManyBWT_Datasets/project1.24/bigGenome10FB.fa
-#/usr/local/bin/jellyfish stats /dupa-filer/bo/ManyBWT_Datasets/project1.24/output
-/usr/local/bin/jellyfish dump -c -t -o /dupa-filer/bo/ManyBWT_Datasets/project1.24/out /dupa-filer/bo/ManyBWT_Datasets/project1.24/output
-#rm /dupa-filer/bo/ManyBWT_Datasets/project1.24/output
-#sort -k 1 -t '	' /dupa-filer/bo/ManyBWT_Datasets/project1.24/out -o /dupa-filer/bo/ManyBWT_Datasets/project1.24/out
-./mySort

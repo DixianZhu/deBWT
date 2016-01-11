@@ -6,7 +6,7 @@ uint64_t *reference;
 uint64_t specialBranchNum;
 int ascend(const void *a, const void *b);
 char getCharacter(uint64_t index);
-uint64_t BinarySearch_unsigned(unsigned int mk, unsigned int *target, int64_t up);
+uint64_t BinarySearch_red(uint64_t mk, uint64_t *target, int64_t up);
 void *multiGenerateSP(void *arg);
 void *multiGenerateSplit(void *arg);
 void *multiAddSeg(void *arg);
