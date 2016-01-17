@@ -33,7 +33,7 @@
 
 ## Usage: ##
 
-- ./deBWT [options] input_sequence
+./deBWT [options] input_sequence
 
 ### options: ###
 - -t: number of thread (default: 8)
