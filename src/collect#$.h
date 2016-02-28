@@ -16,7 +16,6 @@
 #define REDEXTRACT (((uint64_t)1<<(REDLEN<<1))-1)
 #define KMER_LENGTH_PlusOne 32
 #define KMER_LENGTH (KMER_LENGTH_PlusOne-1)
-#define PATH "/media/dell/681CF0681CF03324/TempData"
 #define PATH_LEN 1024
 #define MAXU64 ((uint64_t)(-1))
 uint64_t convert(uint64_t mark);

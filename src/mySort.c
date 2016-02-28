@@ -54,8 +54,8 @@ int mySort(void **arg)
 	printf("start kmercounting\n");
 	while(fscanf(fp1,"%s%lu",seqBuf,&occBuf)!=EOF)
 	{
-                //if(dbgIO%1000==0) printf("dbgIO=%lu\n",dbgIO);
-                //if(dbgIO>=3431775000) printf("%s: %lu\n",seqBuf,occBuf);
+        //if(dbgIO%1000==0) printf("dbgIO=%lu\n",dbgIO);
+        //if(dbgIO>=3431775000) printf("%s: %lu\n",seqBuf,occBuf);
 		int i,j;
 		uint64_t seq=0,dimer;
 		unsigned int move;

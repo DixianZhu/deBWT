@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
     char cmd[1024];
     fprintf(stderr,"---------------------------------------------------------------------------\n");
     fprintf(stderr,"run deBWT (make sure you have at least 120G RAM, and enough disk space):\n");
-    fprintf(stderr,"sequence file: %s\n", source);
+    fprintf(stderr,"sequence file: %s (shouldn't contain any uncertain char like 'N'...)\n", source);
     fprintf(stderr,"output bwt file: %s\n",obj);
     fprintf(stderr,"take %s as the bin to store some temporary files, which will be removed in the end\n",bin );
     fprintf(stderr,"use %lu-thread\n",THREAD_NUM);
