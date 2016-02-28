@@ -169,6 +169,7 @@ void usage(void)
 {
     fprintf(stderr,"usage:\n");
     fprintf(stderr,"deBWT [options] reference\n");
+    fprintf(stderr,"Please make sure your sequence don't contain any uncertain characters like 'N'\n");
     fprintf(stderr, "options:\n" );
     fprintf(stderr, "-o: output bwt file(binary)\n");
     fprintf(stderr, "-t: maximum thread number(default 8)\n" );
