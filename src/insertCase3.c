@@ -131,11 +131,11 @@ int insertCase3(char *obj, char *bin)
 	free(bwtPath);
 
 	fprintf(stderr, "success output bwt!\n");
-	/*
+	
 	free(bwt);
 	free(specialPos);
 	exit(0);
-	*/
+	
 	////////////////////////////////developer mode///////////////////////////////////////
 	// get the occ
 	uint64_t occLen=(bwtLen>>5)+1;

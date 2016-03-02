@@ -222,7 +222,7 @@ int generateSP(void **arg)
 	fpspSpecial=fopen(spSpecialIndexPath,"rb");//just used as temp paramater.
 	uint64_t capacity0=spSplitCapacity[0];
 	uint64_t space0=capacity0>>5;
-	space0++;
+	if((capacity0&MOD32)!=0) space0++;
 	bufReadNum=fread(spCode,sizeof(uint64_t),space0,fpspSpecial);
 	remove(spSpecialIndexPath);
 	free(spSpecialIndexPath);

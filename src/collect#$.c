@@ -227,7 +227,7 @@ void *generateSpecialSA(void *arg)
   uint64_t *bound=(uint64_t *)arg,i;
   int j;
   uint64_t start=bound[0]*(KMER_LENGTH+1);
-  for(i=bound[0];i<bound[1];i++)//This part can be changed to multiThread, while it's fast enough
+  for(i=bound[0];i<bound[1];i++)
   {
    for(j=-KMER_LENGTH;j<=0;j++,start++)
    {
@@ -291,14 +291,14 @@ int cmp(const void *a,const void *b)//the length of each read must longer than 3
    {
      if(cka<=31)
      {
-	checka++; //move the index of #
-	if(checka==countRead) cvb=minusDimer(cvb,cka,1);
+		checka++; //move the index of #
+		if(checka==countRead) cvb=minusDimer(cvb,cka,1);
         else cvb=minusDimer(cvb,cka,0); 
         cka=special[checka]-mka;
      }          
      if(ckb<=31)
      {
-	checkb++;
+		checkb++;
         if(checkb==countRead) cva=minusDimer(cva,ckb,1);
         else cva=minusDimer(cva,ckb,0);
         ckb=special[checkb]-mkb;
@@ -581,7 +581,7 @@ void divideKmer(char (*pK)[KMER_LENGTH+1],uint64_t *SA, char *bin)
            if(branchI>=BUFFERSIZE)
            {
              fwrite(branchBuffer,sizeof(uint64_t),BUFFERSIZE,specialBranch);
-	     branchNum+=BUFFERSIZE;
+	    	 branchNum+=BUFFERSIZE;
              branchI=0;
            }
          }

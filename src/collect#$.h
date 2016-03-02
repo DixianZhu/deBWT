@@ -14,7 +14,7 @@
 #define BLACKCAPACITY ((uint64_t)1<<(BLACKLEN<<1))
 #define REDLEN (KMER_LENGTH-BLACKLEN)
 #define REDEXTRACT (((uint64_t)1<<(REDLEN<<1))-1)
-#define KMER_LENGTH_PlusOne 32
+#define KMER_LENGTH_PlusOne 14
 #define KMER_LENGTH (KMER_LENGTH_PlusOne-1)
 #define PATH_LEN 1024
 #define MAXU64 ((uint64_t)(-1))

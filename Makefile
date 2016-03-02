@@ -13,4 +13,4 @@ deBWT : $(OBJS)
 	$(CC) $(CFLAGS) -o deBWT $(OBJS) $(LIB)
 
 clean : 
-		rm deBWT $(OBJECTS) 
+		rm deBWT $(OBJS) 
