@@ -38,7 +38,7 @@ int insertCase3(char *obj, char *bin)
 	uint64_t bwtSpace=bwtLen>>5;
 	if(bwtLen&MOD32) bwtSpace++;
 	bwt=(uint64_t *)calloc(bwtSpace,sizeof(uint64_t));
-	uint64_t i,segBlue=0,j,segCase2=0;
+	uint64_t i=0,segBlue=0,j=0,segCase2=0;
 	/*
 	printf("let's check case2bwt:\n");
 	for(i=tempBWTLen-11;i<tempBWTLen;i++)
@@ -104,7 +104,7 @@ int insertCase3(char *obj, char *bin)
 	}
 	printf("segCase2=%lu\n",segCase2 );
 	printf("segBlue=%lu\n",segBlue );
-    printf("blueCapacity=%lu\n",blueCapacity);
+    	printf("blueCapacity=%lu\n",blueCapacity);
 	free(case3bound);
 	free(case2bwt);
 	free(blueTable);

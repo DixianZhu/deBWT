@@ -34,6 +34,7 @@
 ## Usage: ##
 
 ./deBWT [options] input_sequence  **(make sure the sequence don't contain any uncertain characters like 'N')**
+
 ### options: ###
 - -t: number of thread (default: 8)
 - -o: bwt string output file
