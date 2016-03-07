@@ -25,7 +25,7 @@ int sortBlue(void **arg)
     fclose(fpspSpecial);
     remove(spSpecialIndexPath);
     free(spSpecialIndexPath);
-    uint64_t i;
+    uint64_t i=0;
     pthread_t myThread[THREAD_NUM];
     
     if(pthread_rwlock_init(&rwlockPoint, NULL))

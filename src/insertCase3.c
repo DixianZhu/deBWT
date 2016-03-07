@@ -38,7 +38,7 @@ int insertCase3(char *obj, char *bin)
 	uint64_t bwtSpace=bwtLen>>5;
 	if(bwtLen&MOD32) bwtSpace++;
 	bwt=(uint64_t *)calloc(bwtSpace,sizeof(uint64_t));
-	uint64_t i,segBlue=0,j,segCase2=0;
+	uint64_t i=0,segBlue=0,j=0,segCase2=0;
 	/*
 	printf("let's check case2bwt:\n");
 	for(i=tempBWTLen-11;i<tempBWTLen;i++)
@@ -117,13 +117,11 @@ int insertCase3(char *obj, char *bin)
 	if(fpbwt==NULL) fprintf(stderr,"cannot create %s!\n",bwtPath), exit(1);
 	fwrite(bwt,sizeof(uint64_t),bwtSpace,fpbwt);
 	fclose(fpbwt);
-	free(bwt);
 
 	bwtPath=getPath(obj,".#");
 	fpbwt=fopen(bwtPath,"wb");
 	if(fpbwt==NULL) fprintf(stderr,"cannot create %s!\n",bwtPath), exit(1);
 	fwrite(specialPos,sizeof(uint64_t),countRead-1,fpbwt);
-	free(specialPos);
 	free(bwtPath);
 
     bwtPath=getPath(obj,".$");
@@ -133,7 +131,11 @@ int insertCase3(char *obj, char *bin)
 	free(bwtPath);
 
 	fprintf(stderr, "success output bwt!\n");
+	
+	free(bwt);
+	free(specialPos);
 	exit(0);
+	
 	////////////////////////////////developer mode///////////////////////////////////////
 	// get the occ
 	uint64_t occLen=(bwtLen>>5)+1;

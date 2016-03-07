@@ -33,7 +33,7 @@ void *collect(void *arg_collect)
    printf("path: %s\n",path );
    gzFile fp = gzopen(path,"r");
    kseq_t *seq=kseq_init(fp);
-   uint64_t i=0,count;
+   uint64_t i=0,count; 
    while(kseq_read(seq)>=0)
    {
       //printf("name: %s (%lu)\n", seq->name.s, i++);
@@ -156,7 +156,6 @@ void *collect(void *arg_collect)
    uint64_t temp_capa=countRead*(KMER_LENGTH+1);
    qsort(SA,temp_capa,sizeof(uint64_t),cmp);
    //////////////////////////////////////////A dbg module for LF-back search/////////////////////////////
-   
    specialHash=(uint64_t *)calloc(countRead,sizeof(uint64_t));
    invHash=(uint64_t *)calloc(countRead,sizeof(uint64_t));
    uint64_t special_p=0;
@@ -172,7 +171,6 @@ void *collect(void *arg_collect)
          }
       }
    }
-   
    //////////////////////////////////////////////////////////////////////////////////////////////////////
    /*print the kmer of SA*/
    divideKmer(seeKMER(SA,bin),SA,bin);
@@ -227,7 +225,7 @@ void *generateSpecialSA(void *arg)
   uint64_t *bound=(uint64_t *)arg,i;
   int j;
   uint64_t start=bound[0]*(KMER_LENGTH+1);
-  for(i=bound[0];i<bound[1];i++)//This part can be changed to multiThread, while it's fast enough
+  for(i=bound[0];i<bound[1];i++)
   {
    for(j=-KMER_LENGTH;j<=0;j++,start++)
    {
@@ -291,14 +289,14 @@ int cmp(const void *a,const void *b)//the length of each read must longer than 3
    {
      if(cka<=31)
      {
-	checka++; //move the index of #
-	if(checka==countRead) cvb=minusDimer(cvb,cka,1);
+		checka++; //move the index of #
+		if(checka==countRead) cvb=minusDimer(cvb,cka,1);
         else cvb=minusDimer(cvb,cka,0); 
         cka=special[checka]-mka;
      }          
      if(ckb<=31)
      {
-	checkb++;
+		checkb++;
         if(checkb==countRead) cva=minusDimer(cva,ckb,1);
         else cva=minusDimer(cva,ckb,0);
         ckb=special[checkb]-mkb;
@@ -342,7 +340,7 @@ uint64_t minusDimer(uint64_t cv,uint64_t index,int flag)//minus the index dimer
   return res;
 }
 
-char (*seeKMER(uint64_t *SA, char *bin))[KMER_LENGTH+1]
+char **seeKMER(uint64_t *SA, char *bin)
 {
   uint64_t len=countRead*(KMER_LENGTH+1);
   uint64_t i;
@@ -364,7 +362,7 @@ char (*seeKMER(uint64_t *SA, char *bin))[KMER_LENGTH+1]
   char *bwt=(char *)calloc(countRead*KMER_LENGTH,sizeof(char));
   uint64_t *bwtSA=(uint64_t*)calloc(countRead*KMER_LENGTH,sizeof(uint64_t));//success free
   uint64_t bwtIndex=0;
-
+  char *kmer=(char *)calloc(KMER_LENGTH+1,sizeof(char));//success free
   /* multiSeeKmer process
   void **para=NULL;
   pthread_t myThread[THREAD_NUM];
@@ -406,7 +404,6 @@ char (*seeKMER(uint64_t *SA, char *bin))[KMER_LENGTH+1]
   */
   for(i=0;i<len;i++)
   {
-    char *kmer=(char *)calloc(KMER_LENGTH+1,sizeof(char));//success free
     //printf("%-10lu",SA[i]);
     uint64_t temp=convert(SA[i]);
     uint64_t precursor=(convert(SA[i]-1)>>62)&3;
@@ -423,7 +420,6 @@ char (*seeKMER(uint64_t *SA, char *bin))[KMER_LENGTH+1]
       else kmer[31-j]=cis[dimer];
       res[i][31-j]=kmer[31-j];
     }
-    
     if(kmer[KMER_LENGTH]!='#'&&kmer[KMER_LENGTH]!='$') //if #$ in the end, we needn't them as patch
     {
       bwt[bwtIndex]=cis[precursor];
@@ -452,9 +448,8 @@ char (*seeKMER(uint64_t *SA, char *bin))[KMER_LENGTH+1]
       //decode(bwtSA[bwtIndex]);
       bwtIndex++;
     }
-    free(kmer);
   }
-  
+  free(kmer);
   char *bwtPath=getPath(bin,"/specialBwt");
   FILE *fpbwt=fopen(bwtPath,"wb");
   free(bwtPath);
@@ -463,10 +458,11 @@ char (*seeKMER(uint64_t *SA, char *bin))[KMER_LENGTH+1]
   free(bwtSA);
   free(bwt);
   fclose(fpbwt);
-  return res;
+  return (char **)res;
 }
-void divideKmer(char (*pK)[KMER_LENGTH+1],uint64_t *SA, char *bin)
+void divideKmer(char **pk, uint64_t *SA, char *bin)
 {
+  char (*pK)[KMER_LENGTH+1]=(char (*)[KMER_LENGTH+1])pk;
   char *headSharpPath=getPath(bin,"/head#"); // change to binary file
   FILE *fph=fopen(headSharpPath,"wb");
   free(headSharpPath);
@@ -581,7 +577,7 @@ void divideKmer(char (*pK)[KMER_LENGTH+1],uint64_t *SA, char *bin)
            if(branchI>=BUFFERSIZE)
            {
              fwrite(branchBuffer,sizeof(uint64_t),BUFFERSIZE,specialBranch);
-	     branchNum+=BUFFERSIZE;
+	         branchNum+=BUFFERSIZE;
              branchI=0;
            }
          }

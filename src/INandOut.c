@@ -25,7 +25,7 @@ int generateBlocks(char *bin)
 	char *specialBwtPath=getPath(bin,"/specialBwt");
 	FILE *fpSpecialBwt=fopen(specialBwtPath,"rb");
 	specialBwt=(char *)calloc(countRead*KMER_LENGTH,sizeof(char));//insert into bwt
-  	specialBwtSA=(uint64_t*)calloc(countRead*KMER_LENGTH,sizeof(uint64_t));//insert into bwt
+  	specialBwtSA=(uint64_t *)calloc(countRead*KMER_LENGTH,sizeof(uint64_t));//insert into bwt
 	if(fread(specialBwt,sizeof(char),countRead*KMER_LENGTH,fpSpecialBwt)<countRead*KMER_LENGTH) 
 		fprintf(stderr, "failed to read specialBwt!\n" ),exit(1);
 	if(fread(specialBwtSA,sizeof(uint64_t),countRead*KMER_LENGTH,fpSpecialBwt)<countRead*KMER_LENGTH)

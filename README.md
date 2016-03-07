@@ -33,11 +33,12 @@
 
 ## Usage: ##
 
-./deBWT [options] input_sequence
+./deBWT [options] input_sequence  **(make sure the sequence don't contain any uncertain characters like 'N', you can use otherTool/transferN to eliminate 'N' or other uncertain char)**
 
 ### options: ###
-- -t: number of thread (default: 8)
+- -t (optional): number of thread (default: 8)
 - -o: bwt string output file
+- -k (optional): k-mer length (default: 32)
 - -j: the directory of jellyfish
 
 ### input_sequence: ###

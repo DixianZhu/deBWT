@@ -34,10 +34,10 @@ int mySort(void **arg)
     trans['T']=trans['t']=3;
     trans['#']=4;// patch for special characters
     trans['$']=5;
-    uint64_t i;
+    uint64_t i=0;
     //////////////////////////////////////kmercounting///////////////////////////////////////////
 	countKmer=(uint64_t *)calloc(BUCKET_CAPACITY,sizeof(uint64_t));
-	char *seqBuf=(char *)calloc(KMER_LENGTH_PlusOne,sizeof(char));
+	char *seqBuf=(char *)calloc(KMER_LENGTH_PlusOne+1,sizeof(char));
 	uint64_t bufferSize=BUFFERSIZE<<1;
 	uint64_t occBuf;
 	uint64_t *writeBuf=(uint64_t *)calloc(bufferSize,sizeof(uint64_t));
@@ -54,8 +54,8 @@ int mySort(void **arg)
 	printf("start kmercounting\n");
 	while(fscanf(fp1,"%s%lu",seqBuf,&occBuf)!=EOF)
 	{
-                //if(dbgIO%1000==0) printf("dbgIO=%lu\n",dbgIO);
-                //if(dbgIO>=3431775000) printf("%s: %lu\n",seqBuf,occBuf);
+        //if(dbgIO%1000==0) printf("dbgIO=%lu\n",dbgIO);
+        //if(dbgIO>=3431775000) printf("%s: %lu\n",seqBuf,occBuf);
 		int i,j;
 		uint64_t seq=0,dimer;
 		unsigned int move;

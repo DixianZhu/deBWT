@@ -7,8 +7,10 @@
 //#include "kseq.h"
 #include "main.h"
 #include "collect#$.h"
-#define VERSION 1.0.0
+#define VERSION "1.0.1"
 uint64_t trans[256];
+int KMER_LENGTH_PlusOne=32;
+int KMER_LENFGTH=31;
 char *get_bin_dir(char *bin);
 void usage(void);
 int main(int argc, char *argv[])
@@ -20,7 +22,7 @@ int main(int argc, char *argv[])
     trans['#']=4;// patch for special characters
     trans['$']=5;
     ////////////////////////////GUI control///////////////////////////////
-    if(argc>8||argc<=1||(argc&1)==1) usage(),exit(1);
+    if(argc>10||argc<6||(argc&1)==1) usage(),exit(1);
     char *source=argv[argc-1];
     char *obj=NULL;
     char *bin=get_bin_dir(argv[0]);
@@ -36,6 +38,13 @@ int main(int argc, char *argv[])
             if(THREAD_NUM==0) fprintf(stderr,"thread number must be a number!\n"), exit(1);
         }
         if(strcmp(argv[i],"-j")==0) jRoot=argv[i+1];
+		if(strcmp(argv[i],"-k")==0)
+		{
+			KMER_LENGTH_PlusOne=atoi(argv[i+1]);
+			KMER_LENGTH=KMER_LENGTH_PlusOne-1;
+			if(KMER_LENGTH_PlusOne<12||KMER_LENGTH_PlusOne>32) 
+				fprintf(stderr, "-k: k-mer length (from 12 to 32, default 32)\n" ),exit(1);
+		}
     }
     if(jRoot==NULL)
     {
@@ -50,14 +59,15 @@ int main(int argc, char *argv[])
     ////////////////////////////////////////////////////////////////////////////////
     char cmd[1024];
     fprintf(stderr,"---------------------------------------------------------------------------\n");
-    fprintf(stderr,"run deBWT (make sure you have at least 120G RAM, and enough disk space):\n");
-    fprintf(stderr,"sequence file: %s\n", source);
+    fprintf(stderr,"run deBWT %s:\n",VERSION);
+    fprintf(stderr,"sequence file: %s (shouldn't contain any uncertain char like 'N'...)\n", source);
     fprintf(stderr,"output bwt file: %s\n",obj);
     fprintf(stderr,"take %s as the bin to store some temporary files, which will be removed in the end\n",bin );
     fprintf(stderr,"use %lu-thread\n",THREAD_NUM);
+	fprintf(stderr,"k-mer length: %d\n",KMER_LENGTH_PlusOne);
     fprintf(stderr,"try to run jellyfish in %s\n", jRoot);
     /////////////////////////////////////////jellyfish///////////////////////////////////////////////////
-    sprintf(cmd, "bash %s/src/kmercounting.sh %s %lu %s %s", bin, source, THREAD_NUM, bin, jRoot);
+    sprintf(cmd, "bash %s/src/kmercounting.sh %s %lu %s %s %d", bin, source, THREAD_NUM, bin, jRoot, KMER_LENGTH_PlusOne);
     if (system(cmd) != 0 ) 
     { 
         fprintf(stderr, "\njellyfish exit abnormally.\n"); 
@@ -169,9 +179,11 @@ void usage(void)
 {
     fprintf(stderr,"usage:\n");
     fprintf(stderr,"deBWT [options] reference\n");
+    fprintf(stderr,"Please make sure your sequence don't contain any uncertain characters like 'N'\n");
     fprintf(stderr, "options:\n" );
     fprintf(stderr, "-o: output bwt file(binary)\n");
-    fprintf(stderr, "-t: maximum thread number(default 8)\n" );
+    fprintf(stderr, "-t (optional): maximum thread number(default 8)\n" );
+    fprintf(stderr, "-k (optional): k-mer length (from 12 to 32, default 32)\n" );
     fprintf(stderr, "-j: jellyfish directory\n" );
     fprintf(stderr, "reference: sequence in fasta or fastq format\n");
 }
