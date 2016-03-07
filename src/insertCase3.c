@@ -104,7 +104,7 @@ int insertCase3(char *obj, char *bin)
 	}
 	printf("segCase2=%lu\n",segCase2 );
 	printf("segBlue=%lu\n",segBlue );
-    	printf("blueCapacity=%lu\n",blueCapacity);
+    printf("blueCapacity=%lu\n",blueCapacity);
 	free(case3bound);
 	free(case2bwt);
 	free(blueTable);
@@ -131,11 +131,11 @@ int insertCase3(char *obj, char *bin)
 	free(bwtPath);
 
 	fprintf(stderr, "success output bwt!\n");
-	
+	/*	
 	free(bwt);
 	free(specialPos);
 	exit(0);
-	
+	*/
 	////////////////////////////////developer mode///////////////////////////////////////
 	// get the occ
 	uint64_t occLen=(bwtLen>>5)+1;
