@@ -156,6 +156,7 @@ void *collect(void *arg_collect)
    uint64_t temp_capa=countRead*(KMER_LENGTH+1);
    qsort(SA,temp_capa,sizeof(uint64_t),cmp);
    /*
+   time_t hash_start=time(0);
    //////////////////////////////////////////A dbg module for LF-back search/////////////////////////////
    specialHash=(uint64_t *)calloc(countRead,sizeof(uint64_t));
    invHash=(uint64_t *)calloc(countRead,sizeof(uint64_t));
@@ -172,8 +173,10 @@ void *collect(void *arg_collect)
          }
       }
    }
-   */
+   time_t hash_end=time(0);
+   printf("hash_dbg time cost: %lu\n",hash_end-hash_start);
    //////////////////////////////////////////////////////////////////////////////////////////////////////
+   */
    /*print the kmer of SA*/
    divideKmer(seeKMER(SA,bin),SA,bin);
    /*

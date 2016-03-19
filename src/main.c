@@ -82,9 +82,6 @@ int main(int argc, char *argv[])
     arg_collect[2]=(void *)source;
     if(mySort((void**)arg_collect)==0) fprintf(stderr,"success sort kmers\n");
     else fprintf(stderr,"failed sort kmers, some error happened!\n"),exit(1);
-    char *kmerTxtPath=getPath(bin,"/out");
-    remove(kmerTxtPath);
-    free(kmerTxtPath);
     /////////////////////////////////////////////////////////////////////////////////////////////////////
     clock_t collect_t=clock();
     time_t mix_start=time(0);

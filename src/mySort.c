@@ -49,7 +49,6 @@ int mySort(void **arg)
     if(fp1==NULL) printf("failed open out!\n"), exit(1);
 	fpKmer=fopen(kmerPath,"wb");
     if(fpKmer==NULL) printf("failed open kmerInfo!\n"), exit(1);
-	free(outPath);
 	time_t countTime_start=time(0);
 	printf("start kmercounting\n");
 	while(fscanf(fp1,"%s%lu",seqBuf,&occBuf)!=EOF)
@@ -86,6 +85,8 @@ int mySort(void **arg)
 	{
 		fwrite(writeBuf,sizeof(uint64_t),bufPoint,fpKmer);
 	}
+	remove(outPath);
+	free(outPath);
     free(seqBuf);
 	free(writeBuf);
     fclose(fpKmer);
