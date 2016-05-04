@@ -10,7 +10,7 @@
 #define VERSION "1.0.1"
 uint64_t trans[256];
 int KMER_LENGTH_PlusOne=32;
-int KMER_LENFGTH=31;
+int KMER_LENGTH=31;
 char *get_bin_dir(char *bin);
 void usage(void);
 int main(int argc, char *argv[])
